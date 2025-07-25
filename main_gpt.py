@@ -8,12 +8,12 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=".env")
 
 # CONFIGURAÇÕES JIRA
-JIRA_BASE_URL = "https://guardcenter.atlassian.net"
+JIRA_BASE_URL = f'https://{os.getenv('JIRA_DOMAIN')}.atlassian.net'
 EMAIL = os.getenv("JIRA_EMAIL")
 API_TOKEN = os.getenv("JIRA_TOKEN")
 STATUS_COLUNA_NOVA_VERSAO = ["HM", "NOVA VERSÃO"]
-PROJETO = "GC"
-SPRINT = "270225"
+PROJETO = os.getenv("JIRA_PROJECT")
+SPRINT = os.getenv("JIRA_SPRINT")
 
 # CONFIGURAÇÕES OPENAI
 # openai.api_key = os.getenv("GPT_KEY")  # Sua API Key da OpenAI
@@ -21,7 +21,7 @@ MODEL = "gpt-4.1"  # ou gpt-3.5-turbo
 # Monte a lista de status com aspas
 status_str = ", ".join(f'"{s}"' for s in STATUS_COLUNA_NOVA_VERSAO)
 # MONTAGEM DA JQL
-JQL = f'project = {PROJETO} AND status in ({status_str})'
+JQL = f'project = {PROJETO} AND sprint = {SPRINT} AND status in ({status_str})'
 HEADERS = {"Accept": "application/json"}
 
 

@@ -8,12 +8,12 @@ import google.generativeai as genai
 from requests.auth import HTTPBasicAuth
 load_dotenv(dotenv_path=".env")
 # CONFIGURAÇÕES JIRA
-JIRA_BASE_URL = "https://guardcenter.atlassian.net"
+JIRA_BASE_URL = f'https://{os.getenv('JIRA_DOMAIN')}.atlassian.net'
 EMAIL = os.getenv("JIRA_EMAIL")
 API_TOKEN = os.getenv("JIRA_TOKEN")
 STATUS_COLUNA_NOVA_VERSAO = ["HM", "NOVA VERSÃO"]
-PROJETO = "GC"
-SPRINT = "103"
+PROJETO = os.getenv("JIRA_PROJECT")
+SPRINT = os.getenv("JIRA_SPRINT")
 
 # CONFIGURAÇÕES GEMINI
 genai.configure(api_key=os.getenv("GEMINI_KEY"))
