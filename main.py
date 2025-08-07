@@ -1,73 +1,72 @@
 import os
-import re
 from typing import List, Dict
 from dotenv import load_dotenv
 import requests
 import json
 import google.generativeai as genai
 from requests.auth import HTTPBasicAuth
+
 load_dotenv(dotenv_path=".env")
-# CONFIGURAÇÕES JIRA
-JIRA_BASE_URL = f'https://{os.getenv('JIRA_DOMAIN')}.atlassian.net'
+
+# JIRA SETTINGS
+JIRA_BASE_URL = f"https://{os.getenv('JIRA_DOMAIN')}.atlassian.net"
 EMAIL = os.getenv("JIRA_EMAIL")
 API_TOKEN = os.getenv("JIRA_TOKEN")
-STATUS_COLUNA_NOVA_VERSAO = ["HM", "NOVA VERSÃO"]
-PROJETO = os.getenv("JIRA_PROJECT")
+NEW_VERSION_STATUS = ["HM", "NOVA VERSÃO"]
+PROJECT = os.getenv("JIRA_PROJECT")
 SPRINT = os.getenv("JIRA_SPRINT")
 
-# CONFIGURAÇÕES GEMINI
+# GEMINI SETTINGS
 genai.configure(api_key=os.getenv("GEMINI_KEY"))
 MODEL = "gemini-2.5-pro"
 
-# Gera string da JQL corretamente
-status_str = ", ".join(f'"{s}"' for s in STATUS_COLUNA_NOVA_VERSAO)
-JQL = f'project = {PROJETO} AND sprint = {SPRINT} AND status in ({status_str})'
+# Build JQL query string
+status_str = ", ".join(f'"{s}"' for s in NEW_VERSION_STATUS)
+JQL = f"project = {PROJECT} AND sprint = {SPRINT} AND status in ({status_str})"
 HEADERS = {"Accept": "application/json"}
 
 
-def buscar_issues(jql):
+def fetch_issues(jql: str):
     url = f"{JIRA_BASE_URL}/rest/api/3/search"
     params = {"jql": jql, "maxResults": 100}
     response = requests.get(
         url, headers=HEADERS, params=params, auth=HTTPBasicAuth(EMAIL, API_TOKEN)
     )
 
-    if response.status_code != 200:
-        raise Exception(f"Erro: {response.status_code} - {response.text}")
-
+    response.raise_for_status()
     return response.json()["issues"]
 
-def extrair_issues_com_comentarios(dados: List[Dict]) -> List[Dict[str, str]]:
-    resultado = []
+def extract_issues_with_comments(data: List[Dict]) -> List[Dict[str, str]]:
+    result = []
 
-    for issue in dados:
+    for issue in data:
         fields = issue.get("fields", {})
-        comentarios = fields.get("comment", {}).get("comments", [])
+        comments = fields.get("comment", {}).get("comments", [])
 
-        resultado.append({
+        result.append({
             "id": issue.get("key", ""),
-            "resumo": fields.get("summary", ""),
+            "summary": fields.get("summary", ""),
             "status": fields.get("status", {}).get("name", ""),
-            "prioridade": fields.get("priority", {}).get("name", ""),
-            "responsavel": fields.get("assignee", {}).get("displayName", ""),
-            "data_criacao": fields.get("created", ""),
-            "data_atualizacao": fields.get("updated", ""),
-            "previsao_inicio": fields.get("customfield_10041", ""),  # ajuste conforme seu campo real
-            "previsao_fim": fields.get("customfield_10042", ""),     # ajuste conforme seu campo real
-            "comentarios": [
+            "priority": fields.get("priority", {}).get("name", ""),
+            "assignee": fields.get("assignee", {}).get("displayName", ""),
+            "created_at": fields.get("created", ""),
+            "updated_at": fields.get("updated", ""),
+            "planned_start": fields.get("customfield_10041", ""),  # adjust for your field
+            "planned_end": fields.get("customfield_10042", ""),    # adjust for your field
+            "comments": [
                 {
-                    "autor": c.get("author", {}).get("displayName", ""),
-                    "data": c.get("created", ""),
-                    "mensagem": c.get("body", "")
+                    "author": c.get("author", {}).get("displayName", ""),
+                    "date": c.get("created", ""),
+                    "message": c.get("body", "")
                 }
-                for c in comentarios
+                for c in comments
             ]
         })
 
-    return resultado
+    return result
 
-def gerar_explicacao_com_gemini(dados_json):
-    conteudo_json = json.dumps(dados_json, indent=2, ensure_ascii=False)
+def generate_summary_with_gemini(data_json: List[Dict]):
+    json_content = json.dumps(data_json, indent=2, ensure_ascii=False)
 
     prompt = f"""
 Você é um assistente de produto. Receberá a resposta crua da API do Jira com tarefas da sprint.
@@ -81,18 +80,18 @@ Seu objetivo é:
 - a saída deve ser um um html estiloso(layout flat)
 
 JSON da API Jira:
-{conteudo_json}
+{json_content}
     """
 
     model = genai.GenerativeModel(MODEL)
-    resposta = model.generate_content(prompt)
+    response = model.generate_content(prompt)
 
-    return resposta.text
+    return response.text
 
 
 if __name__ == "__main__":
-    resultado = buscar_issues(JQL)
-    tarefas = extrair_issues_com_comentarios(resultado)
-    explicacao = gerar_explicacao_com_gemini(resultado)
+    issues = fetch_issues(JQL)
+    tasks = extract_issues_with_comments(issues)
+    summary = generate_summary_with_gemini(tasks)
     print("\n📦 EXPLICAÇÃO DA NOVA VERSÃO:\n")
-    print(explicacao)
+    print(summary)
